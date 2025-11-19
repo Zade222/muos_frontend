@@ -69,11 +69,11 @@ bool archive_helper_is_ext_supported(const char *filename, const char **extensio
     return false;
 }
 
-char** archive_list_contents(const char *archive_path, int *count) {
+ArchiveEntry* archive_list_contents(const char *archive_path, int *count) {
     ArchiveVTable* handler = get_handler_for_file(archive_path);
     ArchiveEntry *entries = NULL;
-    char** working_list = NULL;
-    char** final_list = NULL;
+    ArchiveEntry *working_list = NULL;
+    ArchiveEntry *final_list = NULL;
     int valid_item_count = 0;
     int handler_raw_count = 0;
 
@@ -89,12 +89,12 @@ char** archive_list_contents(const char *archive_path, int *count) {
         return NULL;
     }
 
-    working_list = malloc(MAX_ARCHIVE_DISPLAY_ITEMS * sizeof(char*));
+    working_list = malloc(MAX_ARCHIVE_DISPLAY_ITEMS * sizeof(ArchiveEntry));
     if(!working_list){
         //Todo: Log error: Memory allocation for final_list failed.
         goto cleanup;
     }
-    memset(working_list, 0, MAX_ARCHIVE_DISPLAY_ITEMS * sizeof(char*));
+    memset(working_list, 0, MAX_ARCHIVE_DISPLAY_ITEMS * sizeof(ArchiveEntry));
 
     for (int i = 0; i < handler_raw_count; i++){
         if (valid_item_count >= MAX_ARCHIVE_DISPLAY_ITEMS){
@@ -107,8 +107,9 @@ char** archive_list_contents(const char *archive_path, int *count) {
         bool is_root = (strchr(entries[i].path, '/') == NULL);
 
         if (is_file && is_root){
-            working_list[valid_item_count] = strdup(entries[i].path);
-            if(!working_list[valid_item_count]){
+            working_list[valid_item_count].path = strdup(entries[i].path);
+            working_list[valid_item_count].index = entries[i].index;
+            if(!working_list[valid_item_count].path){
                 //Todo: Log error, strdup failed for item path/filename
                 goto cleanup;
             }
@@ -118,9 +119,9 @@ char** archive_list_contents(const char *archive_path, int *count) {
     *count = valid_item_count;
 
     if (valid_item_count > 0) {
-        char** shrunk_list = realloc(
+        ArchiveEntry* shrunk_list = realloc(
             working_list,
-            valid_item_count * sizeof(char*)
+            valid_item_count * sizeof(ArchiveEntry)
         );
         if(!shrunk_list){
             //Todo: Log error, shrunk list reallocation failed.
@@ -141,8 +142,8 @@ char** archive_list_contents(const char *archive_path, int *count) {
         }
         if(working_list){
             for(int i = 0; i < valid_item_count; i++){
-                if(working_list[i]){
-                    free(working_list[i]);
+                if(working_list[i].path){
+                    free(working_list[i].path);
                 }
             }
             free(working_list);

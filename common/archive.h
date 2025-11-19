@@ -111,10 +111,11 @@ bool archive_helper_is_ext_supported(
  * @brief Lists the contents of a given archive file.
  * @param archive_path The path to the archive.
  * @param count A pointer to an integer to store the number of files.
- * @return An array of strings on success, NULL if the format is unsupported or
- *         an error occurs.
+ * @return A dynamically allocated array of ArchiveEntry structs on success,
+ *         or NULL on failure. The caller is responsible for freeing each path
+ *         string and then the array itself.
  */
-char** archive_list_contents(const char *archive_path, int *count);
+ArchiveEntry* archive_list_contents(const char *archive_path, int *count);
 
 /**
  * @brief Extracts a file from an archive.
