@@ -7,14 +7,28 @@ typedef struct SupportedExtensionInfo {
     char* handler_name;
 } SupportedExtensionInfo;
 
+typedef enum {
+    ARCHIVE_ENTRY_FILE,
+    ARCHIVE_ENTRY_DIRECTORY,
+    ARCHIVE_ENTRY_UNKNOWN
+} ArchiveEntryType;
+
+
+typedef struct ArchiveEntry {
+    char* path;
+    ArchiveEntryType type;
+    int index;
+} ArchiveEntry;
+
 typedef struct ArchiveVTable {
     //Returns true if the handler supports this file extension
     bool (*is_supported)(const char *filename);
 
     /*List the contents of an archive.
-    Return dynamically allocated array of strings (file names).
+    Return dynamically allocated array of ArchiveEntry structs containing
+    information for each file.
     The caller is responsible for freeing the array and the contents.*/
-    char** (*list_contents)(const char *archive_path, int *count);
+    ArchiveEntry* (*list_contents)(const char *archive_path, int *count);
 
     /*Extract a single file from the archive to a temporary directory.
     Return the full path to the extracted file on success, NULL on failure.

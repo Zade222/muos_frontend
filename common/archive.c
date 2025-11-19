@@ -6,6 +6,7 @@
 #include <strings.h>
 
 #define MAX_HANDLERS 50
+#define MAX_ARCHIVE_DISPLAY_ITEMS 255
 static ArchiveVTable* archive_handlers[MAX_HANDLERS];
 static int handler_count = 0;
 
@@ -70,11 +71,84 @@ bool archive_helper_is_ext_supported(const char *filename, const char **extensio
 
 char** archive_list_contents(const char *archive_path, int *count) {
     ArchiveVTable* handler = get_handler_for_file(archive_path);
-    if (handler && handler->list_contents) {
-        return handler->list_contents(archive_path, count);
+    ArchiveEntry *entries = NULL;
+    char** working_list = NULL;
+    char** final_list = NULL;
+    int valid_item_count = 0;
+    int handler_raw_count = 0;
+
+    if(!handler || !handler->list_contents){
+        //Todo: Log warning, extension not supported or list_contents not
+        // implemented.
+        return NULL;
     }
-    *count = 0;
-    return NULL;
+
+    entries = handler->list_contents(archive_path, &handler_raw_count);
+    if(!entries){
+        //Todo: Log error, handler failed to list contents.
+        return NULL;
+    }
+
+    working_list = malloc(MAX_ARCHIVE_DISPLAY_ITEMS * sizeof(char*));
+    if(!working_list){
+        //Todo: Log error: Memory allocation for final_list failed.
+        goto cleanup;
+    }
+    memset(working_list, 0, MAX_ARCHIVE_DISPLAY_ITEMS * sizeof(char*));
+
+    for (int i = 0; i < handler_raw_count; i++){
+        if (valid_item_count >= MAX_ARCHIVE_DISPLAY_ITEMS){
+            //Todo: Log warning, archive contains more than the supported 255
+            // items. List contains first 255 valid items.
+            break;
+        }
+
+        bool is_file = (entries[i].type == ARCHIVE_ENTRY_FILE);
+        bool is_root = (strchr(entries[i].path, '/') == NULL);
+
+        if (is_file && is_root){
+            working_list[valid_item_count] = strdup(entries[i].path);
+            if(!working_list[valid_item_count]){
+                //Todo: Log error, strdup failed for item path/filename
+                goto cleanup;
+            }
+            valid_item_count++;
+        }
+    }
+    *count = valid_item_count;
+
+    if (valid_item_count > 0) {
+        char** shrunk_list = realloc(
+            working_list,
+            valid_item_count * sizeof(char*)
+        );
+        if(!shrunk_list){
+            //Todo: Log error, shrunk list reallocation failed.
+            goto cleanup;
+        }
+        final_list = shrunk_list;
+        working_list = NULL;
+    }
+
+    cleanup:
+        if(entries){
+            for (int i = 0; i < handler_raw_count; i++){
+                if(entries[i].path){
+                    free(entries[i].path);
+                }
+            }
+            free(entries);
+        }
+        if(working_list){
+            for(int i = 0; i < valid_item_count; i++){
+                if(working_list[i]){
+                    free(working_list[i]);
+                }
+            }
+            free(working_list);
+        }
+
+        return final_list;
 }
 
 char* archive_extract_file(

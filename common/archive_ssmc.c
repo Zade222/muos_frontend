@@ -14,10 +14,9 @@ static bool ssmc_is_supported(const char *filename) {
     return archive_helper_is_ext_supported(filename, ssmc_extensions);
 }
 
-
-static char** ssmc_list_contents(const char *archive_path, int *count){
+ArchiveEntry* ssmc_list_contents(const char *archive_path, int *count){
     *count = 0;
-    char **file_list = NULL;
+    ArchiveEntry *item_list = NULL;
 
     FILE *archive_file = NULL;
     uint8_t *manifest_buffer = NULL;
@@ -105,11 +104,11 @@ static char** ssmc_list_contents(const char *archive_path, int *count){
         goto cleanup;
     }
 
-    file_list = malloc(manifest_len * sizeof(char*));
-    if (!file_list) {
+    item_list = malloc(manifest_len * sizeof(ArchiveEntry));
+    if (!item_list) {
         goto cleanup;
     }
-    memset(file_list, 0, manifest_len * sizeof(char*));
+    memset(item_list, 0, manifest_len * sizeof(ArchiveEntry));
 
     for (uintptr_t i = 0; i < manifest_len; i++) {
         const char* source_filename;
@@ -124,25 +123,30 @@ static char** ssmc_list_contents(const char *archive_path, int *count){
             )->manifests[i].filename;
         }
 
-        file_list[i] = strdup(source_filename);
-        if (!file_list[i]) {
+        item_list[i].path = strdup(source_filename);
+        if (!item_list[i].path) {
             //Todo: Log error, filename allocation failed
             goto cleanup;
         }
+
+        //In ssmc archives, there are only files.
+        item_list[i].type = ARCHIVE_ENTRY_FILE;
+
+        item_list[i].index = i;
     }
 
     //Todo: Log msg, file list scuessfully retrieved from ssmc archive.
     *count = (int)manifest_len;
 
     cleanup:
-        if (*count == 0 && file_list) {
+        if (*count == 0 && item_list) {
             for (uintptr_t i = 0; i < manifest_len; i++) {
-                if (file_list[i]) {
-                    free(file_list[i]);
+                if (item_list[i].path) {
+                    free(item_list[i].path);
                 }
             }
-            free(file_list);
-            file_list = NULL;
+            free(item_list);
+            item_list = NULL;
         }
 
         if (archive_file) {
@@ -158,7 +162,7 @@ static char** ssmc_list_contents(const char *archive_path, int *count){
             free_parsed_manifest_u128(parsed_manifest128);
         }
 
-        return file_list;
+        return item_list;
 }
 
 /**
