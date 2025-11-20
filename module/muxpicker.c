@@ -101,9 +101,8 @@ static void image_refresh(void) {
 }
 
 static void create_picker_items(void) {
-    if (device.BOARD.HAS_NETWORK && is_network_connected() &&
-        strcasecmp(picker_type, "/theme") == 0 && strcasecmp(base_dir, sys_dir) == 0 &&
-        !is_ksk(kiosk.CUSTOM.THEME_DOWN)) {
+    if (device.BOARD.HAS_NETWORK && strcasecmp(picker_type, "/theme") == 0
+        && strcasecmp(base_dir, sys_dir) == 0 && !is_ksk(kiosk.CUSTOM.THEME_DOWN)) {
         add_item(&items, &item_count, lang.MUXPICKER.THEME_DOWN,
                  lang.MUXPICKER.THEME_DOWN, "", MENU);
     }
@@ -205,10 +204,14 @@ static void handle_a(void) {
     play_sound(SND_CONFIRM);
 
     if (items[current_item_index].content_type == MENU) {
-        load_mux("themedwn");
-
-        close_input();
-        mux_input_stop();
+        if (is_network_connected()) {
+            load_mux("themedwn");
+            close_input();
+            mux_input_stop();
+        } else {
+            play_sound(SND_ERROR);
+            toast_message(lang.GENERIC.NEED_CONNECT, MEDIUM);
+        }
         return;
     } else if (items[current_item_index].content_type == FOLDER) {
         char n_dir[MAX_BUFFER_SIZE];
@@ -297,7 +300,7 @@ static void handle_x(void) {
 
     if (!hold_call) {
         play_sound(SND_ERROR);
-        toast_message(lang.MUXPICKER.HOLD_CONFIRM, SHORT);
+        toast_message(lang.GENERIC.HOLD_CONFIRM, SHORT);
         return;
     }
 
@@ -316,7 +319,7 @@ static void handle_x(void) {
 
     if (!file_exist(relative_zip_path)) {
         play_sound(SND_ERROR);
-        toast_message(lang.MUXPICKER.FAILED, MEDIUM);
+        toast_message(lang.GENERIC.REMOVE_FAIL, MEDIUM);
         return;
     }
 

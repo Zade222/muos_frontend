@@ -63,6 +63,7 @@ void load_lang(struct mux_lang *lang) {
     GENERIC_FIELD(lang->GENERIC.EXTRACT, "Extract");
     GENERIC_FIELD(lang->GENERIC.FILTER, "Filter");
     GENERIC_FIELD(lang->GENERIC.HIDDEN, "Hidden");
+    GENERIC_FIELD(lang->GENERIC.HOLD_CONFIRM, "Hold L2 and press X to confirm deletion!");
     GENERIC_FIELD(lang->GENERIC.INCLUDED, "Included");
     GENERIC_FIELD(lang->GENERIC.INDIVIDUAL, "Individual");
     GENERIC_FIELD(lang->GENERIC.INFO, "Info");
@@ -72,6 +73,7 @@ void load_lang(struct mux_lang *lang) {
     GENERIC_FIELD(lang->GENERIC.LOAD, "Load");
     GENERIC_FIELD(lang->GENERIC.LOADING, "Loading…");
     GENERIC_FIELD(lang->GENERIC.MIGRATE, "Migrate to SD2");
+    GENERIC_FIELD(lang->GENERIC.NEED_CONNECT, "Network connection required…");
     GENERIC_FIELD(lang->GENERIC.NEW, "New");
     GENERIC_FIELD(lang->GENERIC.NOGLYPH, "No Glyph");
     GENERIC_FIELD(lang->GENERIC.NOT_CONNECTED, "Not Connected");
@@ -85,6 +87,7 @@ void load_lang(struct mux_lang *lang) {
     GENERIC_FIELD(lang->GENERIC.RECURSIVE, "Recursive");
     GENERIC_FIELD(lang->GENERIC.REFRESH, "Refreshing…");
     GENERIC_FIELD(lang->GENERIC.REMOVE, "Remove");
+    GENERIC_FIELD(lang->GENERIC.REMOVE_FAIL, "Failed to remove item…");
     GENERIC_FIELD(lang->GENERIC.RESCAN, "Rescan");
     GENERIC_FIELD(lang->GENERIC.RESTORE, "Restore");
     GENERIC_FIELD(lang->GENERIC.RESTRICTED, "Restricted");
@@ -668,9 +671,7 @@ void load_lang(struct mux_lang *lang) {
     SPECIFIC_FIELD(lang->MUXPICKER.THEME_DOWN, "Theme Download");
     SPECIFIC_FIELD(lang->MUXPICKER.INVALID_VER, "Incompatible Theme Version Detected");
     SPECIFIC_FIELD(lang->MUXPICKER.INVALID_RES, "Incompatible Theme Resolution Detected");
-    SPECIFIC_FIELD(lang->MUXPICKER.HOLD_CONFIRM, "Hold L2 and press X to confirm deletion!");
     SPECIFIC_FIELD(lang->MUXPICKER.PROTECTED, "This theme is protected from deletion!");
-    SPECIFIC_FIELD(lang->MUXPICKER.FAILED, "Failed to remove item…");
     SPECIFIC_FIELD(lang->MUXPICKER.NONE.CREDIT, "There are no attributed credits!");
     SPECIFIC_FIELD(lang->MUXPICKER.NONE.CUSTOM, "No Custom Packages Found");
     SPECIFIC_FIELD(lang->MUXPICKER.NONE.CATALOGUE, "No Catalogue Packages Found");
@@ -949,8 +950,11 @@ void load_lang(struct mux_lang *lang) {
     SPECIFIC_FIELD(lang->MUXTWEAKGEN.TITLE, "GENERAL SETTINGS");
     SPECIFIC_FIELD(lang->MUXTWEAKGEN.DATETIME, "Date and Time");
     SPECIFIC_FIELD(lang->MUXTWEAKGEN.TEMP, "Colour Temperature");
+    SPECIFIC_FIELD(lang->MUXTWEAKGEN.TEMP_SET, "Setting Colour Temperature");
     SPECIFIC_FIELD(lang->MUXTWEAKGEN.BRIGHT, "Brightness");
+    SPECIFIC_FIELD(lang->MUXTWEAKGEN.BRIGHT_SET, "Setting Brightness");
     SPECIFIC_FIELD(lang->MUXTWEAKGEN.VOLUME, "Volume");
+    SPECIFIC_FIELD(lang->MUXTWEAKGEN.VOLUME_SET, "Setting Volume");
     SPECIFIC_FIELD(lang->MUXTWEAKGEN.HDMI, "HDMI Output");
     SPECIFIC_FIELD(lang->MUXTWEAKGEN.ADVANCED, "Advanced Settings");
     SPECIFIC_FIELD(lang->MUXTWEAKGEN.RGB, "Device RGB Lights");
