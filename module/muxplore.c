@@ -1,15 +1,20 @@
 #include "muxshare.h"
 #include "../common/skip_list.h"
+#include "../common/archive.h"
+#include <stdlib.h>
+#include <string.h>
 
 static lv_obj_t *ui_imgSplash;
 static lv_obj_t *ui_viewport_objects[7];
 
 static char prev_dir[PATH_MAX];
+static char current_archive[PATH_MAX] = "";
 
 static int exit_status = 0;
 static int sys_index = -1;
 static int file_count = 0;
 static int dir_count = 0;
+static int arc_count = 0;
 static int starter_image = 0;
 static int splash_valid = 0;
 
@@ -273,40 +278,48 @@ static void gen_item(char **file_names, int file_count) {
     }
 
     for (int i = 0; i < file_count; i++) {
-        char full_path[MAX_BUFFER_SIZE];    
+        char full_path[MAX_BUFFER_SIZE];
         snprintf(full_path, sizeof(full_path), "%s/%s", sys_dir, file_names[i]);
         if (!in_skiplist(&skiplist, full_path)) {
-            int has_custom_name = 0;
-            char fn_name[MAX_BUFFER_SIZE];
-            char *stripped_name = strip_ext(file_names[i]);
+            if (get_handler_for_file(file_names[i]) != NULL){
+                char* display_name = strip_ext(file_names[i]);
+                add_item(&items, &item_count, file_names[i], display_name, "", ARC);
+                //adjust_visual_label is explicitly not used as the region, revision or extra information should be shown.
+                free(display_name);
+            } else {
+                int has_custom_name = 0;
+                char fn_name[MAX_BUFFER_SIZE];
+                char *stripped_name = strip_ext(file_names[i]);
 
-            if (fn_valid) {
-                struct json custom_lookup_json = json_object_get(fn_json, str_tolower(stripped_name));
-                if (json_exists(custom_lookup_json)) {
-                    json_string_copy(custom_lookup_json, fn_name, sizeof(fn_name));
-                    has_custom_name = 1;
+                if (fn_valid) {
+                    struct json custom_lookup_json = json_object_get(fn_json, str_tolower(stripped_name));
+                    if (json_exists(custom_lookup_json)) {
+                        json_string_copy(custom_lookup_json, fn_name, sizeof(fn_name));
+                        has_custom_name = 1;
+                    }
                 }
+
+                int lookup_line = CONTENT_LOOKUP;
+                char name_lookup[MAX_BUFFER_SIZE];
+                snprintf(name_lookup, sizeof(name_lookup), "%s/%s.cfg", str_rem_last_char(init_meta_dir, 1), stripped_name);
+
+                if (!file_exist(name_lookup)) {
+                    snprintf(name_lookup, sizeof(name_lookup), "%score.cfg", init_meta_dir);
+                    lookup_line = GLOBAL_LOOKUP;
+                }
+
+                if (!has_custom_name) {
+                    const char *lookup_result = read_line_int_from(name_lookup, lookup_line) ? lookup(stripped_name) : NULL;
+                    snprintf(fn_name, sizeof(fn_name), "%s", lookup_result ? lookup_result : stripped_name);
+                }
+
+                content_item *new_item = add_item(&items, &item_count, file_names[i], fn_name, "", ITEM);
+                adjust_visual_label(new_item->display_name, config.VISUAL.NAME, config.VISUAL.DASH);
+
+                free(stripped_name);
             }
-
-            int lookup_line = CONTENT_LOOKUP;
-            char name_lookup[MAX_BUFFER_SIZE];
-            snprintf(name_lookup, sizeof(name_lookup), "%s/%s.cfg", str_rem_last_char(init_meta_dir, 1), stripped_name);
-
-            if (!file_exist(name_lookup)) {
-                snprintf(name_lookup, sizeof(name_lookup), "%score.cfg", init_meta_dir);
-                lookup_line = GLOBAL_LOOKUP;
-            }
-
-            if (!has_custom_name) {
-                const char *lookup_result = read_line_int_from(name_lookup, lookup_line) ? lookup(stripped_name) : NULL;
-                snprintf(fn_name, sizeof(fn_name), "%s", lookup_result ? lookup_result : stripped_name);
-            }
-
-            content_item *new_item = add_item(&items, &item_count, file_names[i], fn_name, "", ITEM);
-            adjust_visual_label(new_item->display_name, config.VISUAL.NAME, config.VISUAL.DASH);
-
-            free(file_names[i]);
         }
+        free(file_names[i]);
     }
 
     free_skiplist(&skiplist);
@@ -390,89 +403,121 @@ static void create_content_items(void) {
     char item_curr_dir[PATH_MAX];
     snprintf(item_curr_dir, sizeof(item_curr_dir), "%s", sys_dir);
 
-    char **dir_names = NULL;
-    char **file_names = NULL;
-    add_directory_and_file_names(item_curr_dir, &dir_names, &file_names);
+    if (strlen(current_archive) > 0) { //archive browsing branch
+        turbo_time(1, 1);
 
-    int fn_valid = 0;
-    struct json fn_json = {0};
+        update_title(current_archive, 0, (struct json){0}, lang.MUXPLORE.TITLE, STORAGE_PATH);
 
-    turbo_time(1, 1);
-
-    if (config.VISUAL.FRIENDLYFOLDER) {
-        char folder_name_file[MAX_BUFFER_SIZE];
-        snprintf(folder_name_file, sizeof(folder_name_file), INFO_NAM_PATH "/folder.json");
-
-        if (file_exist(folder_name_file)) {
-            char *file_content = read_all_char_from(folder_name_file);
-
-            if (file_content && json_valid(file_content)) {
-                fn_valid = 1;
-                fn_json = json_parse(strdup(file_content));
-                LOG_SUCCESS(mux_module, "Using Friendly Folder: %s", folder_name_file)
-            } else {
-                LOG_WARN(mux_module, "Invalid Friendly Folder: %s", folder_name_file)
+        ArchiveEntry* archive_entries = archive_list_contents(current_archive, &file_count);
+        if (archive_entries) {
+            for (int i = 0; i < file_count; i++) {
+                content_item *new_item = add_item(&items, &item_count, archive_entries[i].path, archive_entries[i].path, "", ITEM);
+                new_item->archive_index = archive_entries[i].index;
             }
 
-            free(file_content);
-        } else {
-            LOG_WARN(mux_module, "Friendly Folder does not exist: %s", folder_name_file)
-        }
-    }
-
-    update_title(item_curr_dir, fn_valid, fn_json, lang.MUXPLORE.TITLE, STORAGE_PATH);
-
-    if (dir_count > 0 || file_count > 0) {
-        for (int i = 0; i < dir_count; i++) {
-            char *friendly_folder_name = get_friendly_folder_name(dir_names[i], fn_valid, fn_json);
-
-            char rom_dir[MAX_BUFFER_SIZE];
-            snprintf(rom_dir, sizeof(rom_dir), "%s/%s", sys_dir, dir_names[i]);
-            automatic_assign_core(rom_dir);
-            content_item *new_item = add_item(&items, &item_count, dir_names[i], friendly_folder_name, "", FOLDER);
-            new_item->glyph_icon = "folder";
-            adjust_visual_label(new_item->display_name, config.VISUAL.NAME, config.VISUAL.DASH);
-
-            if (config.VISUAL.FOLDERITEMCOUNT) {
-                char display_name[MAX_BUFFER_SIZE];
-                snprintf(display_name, sizeof(display_name), "%s (%d)",
-                         new_item->display_name, get_directory_item_count(item_curr_dir, new_item->name, 1));
-                new_item->display_name = strdup(display_name);
+            for (int i = 0; i < file_count; i++) {
+                free(archive_entries[i].path);
             }
-
-            free(dir_names[i]);
-            free(friendly_folder_name);
+            free(archive_entries);
         }
-
+        dir_count = 0; //Directories not supported in archives
         sort_items(items, item_count);
 
-        grid_mode_enabled = !disable_grid_file_exists(item_curr_dir) && theme.GRID.ENABLED && (
-                (file_count > 0 && config.VISUAL.GRID_MODE_CONTENT) ||
-                (dir_count > 0 && file_count == 0)
-        );
-        if (!grid_mode_enabled) {
-            for (int i = 0; i < dir_count; i++) {
-                if (i < theme.MUX.ITEM.COUNT) {
-                    gen_label(items[i].use_module, items[i].glyph_icon, items[i].display_name);
-                }
-
-                if (strcasecmp(items[i].name, prev_dir) == 0) sys_index = i;
-            }
-        }
-
-        gen_item(file_names, file_count);
-
+        grid_mode_enabled = !disable_grid_file_exists(item_curr_dir) && theme.GRID.ENABLED && (file_count > 0 && config.VISUAL.GRID_MODE_CONTENT);
         if (grid_mode_enabled) {
             init_navigation_group_grid();
         }
+        if (item_count > 0) {
+            lv_obj_update_layout(ui_pnlContent);
+        }
 
-        if (ui_count > 0) lv_obj_update_layout(ui_pnlContent);
+        turbo_time(0, 1);
 
-        free(file_names);
-        free(dir_names);
+    } else { //fileystem browsing branch
+        char **dir_names = NULL;
+        char **file_names = NULL;
+        add_directory_and_file_names(item_curr_dir, &dir_names, &file_names);
+
+        int fn_valid = 0;
+        struct json fn_json = {0};
+
+        turbo_time(1, 1);
+
+        if (config.VISUAL.FRIENDLYFOLDER) {
+            char folder_name_file[MAX_BUFFER_SIZE];
+            snprintf(folder_name_file, sizeof(folder_name_file), INFO_NAM_PATH "/folder.json");
+
+            if (file_exist(folder_name_file)) {
+                char *file_content = read_all_char_from(folder_name_file);
+
+                if (file_content && json_valid(file_content)) {
+                    fn_valid = 1;
+                    fn_json = json_parse(strdup(file_content));
+                    LOG_SUCCESS(mux_module, "Using Friendly Folder: %s", folder_name_file)
+                } else {
+                    LOG_WARN(mux_module, "Invalid Friendly Folder: %s", folder_name_file)
+                }
+
+                free(file_content);
+            } else {
+                LOG_WARN(mux_module, "Friendly Folder does not exist: %s", folder_name_file)
+            }
+        }
+
+        update_title(item_curr_dir, fn_valid, fn_json, lang.MUXPLORE.TITLE, STORAGE_PATH);
+
+        if (dir_count > 0 || file_count > 0) {
+            for (int i = 0; i < dir_count; i++) {
+                char *friendly_folder_name = get_friendly_folder_name(dir_names[i], fn_valid, fn_json);
+
+                char rom_dir[MAX_BUFFER_SIZE];
+                snprintf(rom_dir, sizeof(rom_dir), "%s/%s", sys_dir, dir_names[i]);
+                automatic_assign_core(rom_dir);
+                content_item *new_item = add_item(&items, &item_count, dir_names[i], friendly_folder_name, "", FOLDER);
+                new_item->glyph_icon = "folder";
+                adjust_visual_label(new_item->display_name, config.VISUAL.NAME, config.VISUAL.DASH);
+
+                if (config.VISUAL.FOLDERITEMCOUNT) {
+                    char display_name[MAX_BUFFER_SIZE];
+                    snprintf(display_name, sizeof(display_name), "%s (%d)",
+                             new_item->display_name, get_directory_item_count(item_curr_dir, new_item->name, 1));
+                    new_item->display_name = strdup(display_name);
+                }
+
+                free(dir_names[i]);
+                free(friendly_folder_name);
+            }
+
+            sort_items(items, item_count);
+
+            grid_mode_enabled = !disable_grid_file_exists(item_curr_dir) && theme.GRID.ENABLED && (
+                    (file_count > 0 && config.VISUAL.GRID_MODE_CONTENT) ||
+                    (dir_count > 0 && file_count == 0)
+            );
+            if (!grid_mode_enabled) {
+                for (int i = 0; i < dir_count; i++) {
+                    if (i < theme.MUX.ITEM.COUNT) {
+                        gen_label(items[i].use_module, items[i].glyph_icon, items[i].display_name);
+                    }
+
+                    if (strcasecmp(items[i].name, prev_dir) == 0) sys_index = i;
+                }
+            }
+
+            gen_item(file_names, file_count);
+
+            if (grid_mode_enabled) {
+                init_navigation_group_grid();
+            }
+
+            if (ui_count > 0) lv_obj_update_layout(ui_pnlContent);
+
+            free(file_names);
+            free(dir_names);
+        }
+
+        turbo_time(0, 1);
     }
-
-    turbo_time(0, 1);
 }
 
 static void update_list_item(lv_obj_t *ui_lblItem, lv_obj_t *ui_lblItemGlyph, int index) {
@@ -603,50 +648,75 @@ static void process_load(int from_start) {
     play_sound(SND_CONFIRM);
     int load_message = 0;
 
-    if (items[current_item_index].content_type == FOLDER) {
-        load_message = 1;
+    if(strlen(current_archive) > 0) {
+        int file_index_to_extract = items[current_item_index].archive_index;
+        char* extracted_path = archive_extract_file(current_archive, items[current_item_index].name, file_index_to_extract, "/tmp");
 
-        char n_dir[MAX_BUFFER_SIZE];
-        snprintf(n_dir, sizeof(n_dir), "%s/%s",
-                 sys_dir, items[current_item_index].name);
+        if (extracted_path != NULL && strlen(extracted_path) > 0){
+            char* extracted_dir = strip_dir(extracted_path);
+            char* extracted_filename = get_last_dir(extracted_path);
 
-        write_text_to_file(EXPLORE_DIR, "w", CHAR, n_dir);
-    } else {
-        write_text_to_file(MUOS_IDX_LOAD, "w", INT, current_item_index);
-
-        if (load_content(0, sys_dir, items[current_item_index].name)) {
-            if (config.SETTINGS.ADVANCED.LOCK) {
-                int result = 0;
-
-                while (result != 1) {
-                    result = muxpass_main(PCT_LAUNCH);
-
-                    switch (result) {
-                        case 1:
-                            show_splash();
-                            config.VISUAL.BLACKFADE ? fade_to_black(ui_screen) : unload_image_animation();
-                            exit_status = 1;
-                            break;
-                        case 2:
-                        default:
-                            if (file_exist(MUOS_ROM_LOAD)) remove(MUOS_ROM_LOAD);
-                            if (file_exist(MUOS_CON_LOAD)) remove(MUOS_CON_LOAD);
-                            if (file_exist(MUOS_GOV_LOAD)) remove(MUOS_GOV_LOAD);
-
-                            write_text_to_file(MUOS_IDX_LOAD, "w", INT, current_item_index);
-
-                            goto load_end;
-                    }
-                }
-            } else {
+            if(load_content(0, extracted_dir, extracted_filename)){
                 show_splash();
                 config.VISUAL.BLACKFADE ? fade_to_black(ui_screen) : unload_image_animation();
                 exit_status = 1;
+            } else {
+                toast_message("Failed to load extracted content.", SHORT);
             }
+            free(extracted_dir);
+            free(extracted_path);
         } else {
-            write_text_to_file(MUOS_ASS_FROM, "w", CHAR, "explore");
-            write_text_to_file(OPTION_SKIP, "w", CHAR, "");
-            load_mux("assign");
+            toast_message("Failed to extract file from archive.", SHORT);
+        }
+    } else {
+        if (items[current_item_index].content_type == FOLDER) {
+            load_message = 1;
+
+            char n_dir[MAX_BUFFER_SIZE];
+            snprintf(n_dir, sizeof(n_dir), "%s/%s",
+                    sys_dir, items[current_item_index].name);
+
+            write_text_to_file(EXPLORE_DIR, "w", CHAR, n_dir);
+        } else if (items[current_item_index].content_type == ARC) {
+            load_message = 1;
+            snprintf(current_archive, sizeof(current_archive), "%s/%s", sys_dir, items[current_item_index].name);
+        } else {
+            write_text_to_file(MUOS_IDX_LOAD, "w", INT, current_item_index);
+
+            if (load_content(0, sys_dir, items[current_item_index].name)) {
+                if (config.SETTINGS.ADVANCED.LOCK) {
+                    int result = 0;
+
+                    while (result != 1) {
+                        result = muxpass_main(PCT_LAUNCH);
+
+                        switch (result) {
+                            case 1:
+                                show_splash();
+                                config.VISUAL.BLACKFADE ? fade_to_black(ui_screen) : unload_image_animation();
+                                exit_status = 1;
+                                break;
+                            case 2:
+                            default:
+                                if (file_exist(MUOS_ROM_LOAD)) remove(MUOS_ROM_LOAD);
+                                if (file_exist(MUOS_CON_LOAD)) remove(MUOS_CON_LOAD);
+                                if (file_exist(MUOS_GOV_LOAD)) remove(MUOS_GOV_LOAD);
+
+                                write_text_to_file(MUOS_IDX_LOAD, "w", INT, current_item_index);
+
+                                goto load_end;
+                        }
+                    }
+                } else {
+                    show_splash();
+                    config.VISUAL.BLACKFADE ? fade_to_black(ui_screen) : unload_image_animation();
+                    exit_status = 1;
+                }
+            } else {
+                write_text_to_file(MUOS_ASS_FROM, "w", CHAR, "explore");
+                write_text_to_file(OPTION_SKIP, "w", CHAR, "");
+                load_mux("assign");
+            }
         }
     }
 
@@ -691,14 +761,19 @@ static void handle_b(void) {
 
     play_sound(SND_BACK);
 
-    if (at_base(sys_dir, "ROMS")) {
-        remove(EXPLORE_DIR);
+    if (strlen(current_archive) > 0){
+        current_archive[0] = '\0';
+        load_mux("explore");
     } else {
-        char *base_dir = strrchr(sys_dir, '/');
-        if (base_dir) write_text_to_file(EXPLORE_DIR, "w", CHAR, strndup(sys_dir, base_dir - sys_dir));
-    }
+        if (at_base(sys_dir, "ROMS")) {
+            remove(EXPLORE_DIR);
+        } else {
+            char *base_dir = strrchr(sys_dir, '/');
+            if (base_dir) write_text_to_file(EXPLORE_DIR, "w", CHAR, strndup(sys_dir, base_dir - sys_dir));
+        }
 
-    load_mux(file_exist(EXPLORE_DIR) ? "explore" : "launcher");
+        load_mux(file_exist(EXPLORE_DIR) ? "explore" : "launcher");
+    }
 
     close_input();
     mux_input_stop();
@@ -890,6 +965,8 @@ int muxplore_main(int index, char *dir) {
     sys_index = index;
 
     init_module("muxplore");
+
+    register_all_archive_handlers();
 
     init_theme(1, 1);
 
