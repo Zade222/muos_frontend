@@ -662,8 +662,25 @@ static void process_load(int from_start) {
 
     if(strlen(current_archive) > 0) {
         int file_index_to_extract = items[current_item_index].archive_index;
-        char* extracted_path = archive_extract_file(current_archive, items[current_item_index].name, file_index_to_extract, "/tmp");
 
+        char target_path[PATH_MAX];
+        snprintf(target_path, sizeof(target_path), "/tmp/%s", items[current_item_index].name);
+
+        if (file_exist(target_path)) {
+            LOG_WARN(mux_module, "Pre-existing file found at %s. Attempting to remove.", target_path);
+
+            if (remove(target_path) != 0) {
+                LOG_ERROR(mux_module, "Failed to remove existing file: %s. Aborting launch.", target_path);
+                perror("remove");
+                load_mux("explore");
+                close_input();
+                mux_input_stop();
+                return;
+            }
+            LOG_SUCCESS(mux_module, "Successfully removed old file.");
+        }
+
+        char* extracted_path = archive_extract_file(current_archive, items[current_item_index].name, file_index_to_extract, "/tmp");
         if (extracted_path != NULL && strlen(extracted_path) > 0){
             char* extracted_dir = strip_dir(extracted_path);
             char* extracted_filename = get_last_dir(extracted_path);
