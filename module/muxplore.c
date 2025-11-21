@@ -283,8 +283,11 @@ static void gen_item(char **file_names, int file_count) {
         if (!in_skiplist(&skiplist, full_path)) {
             if (get_handler_for_file(file_names[i]) != NULL){
                 char* display_name = strip_ext(file_names[i]);
-                add_item(&items, &item_count, file_names[i], display_name, "", ARC);
+                content_item *new_item = add_item(&items, &item_count, file_names[i], display_name, "", ARC);
                 //adjust_visual_label is explicitly not used as the region, revision or extra information should be shown.
+
+                //"installed" icon is delibrately used vice archive since it makes more visual sense.
+                new_item->glyph_icon = "installed";
                 free(display_name);
             } else {
                 int has_custom_name = 0;
