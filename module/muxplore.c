@@ -41,6 +41,15 @@ static char *load_content_description(void) {
                      INFO_CAT_PATH, catalogue_name);
             LOG_INFO(mux_module, "Falling back to catalogue name for content description '%s'", catalogue_name)
         }
+    } else if (items[current_item_index].content_type == ARC) {
+        snprintf(content_desc, sizeof(content_desc), "%s/%s/text/%s.txt",
+            INFO_CAT_PATH, core_desc, desc_name);
+        if (file_exist(content_desc)) {
+            return read_all_char_from(content_desc);
+        } else {
+            snprintf(current_meta_text, sizeof(current_meta_text), "Compressed archive file. Open to browse contents.");
+            return current_meta_text;
+        }
     } else {
         snprintf(content_desc, sizeof(content_desc), "%s/%s/text/%s.txt",
                  INFO_CAT_PATH, core_desc, desc_name);
