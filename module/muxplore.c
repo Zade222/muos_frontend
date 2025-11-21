@@ -811,6 +811,11 @@ static void handle_b(void) {
 static void handle_x(void) {
     if (msgbox_active || !ui_count || hold_call) return;
 
+    //Refresh not needed or supported in an archive.
+    if (strlen(current_archive) > 0) {
+        return;
+    }
+
     toast_message(lang.MUXPLORE.REFRESH_RUN, FOREVER);
     lv_obj_move_foreground(ui_pnlMessage);
 
@@ -831,7 +836,9 @@ static void handle_x(void) {
 static void handle_y(void) {
     if (msgbox_active || !ui_count || hold_call) return;
 
-    if (items[current_item_index].content_type == FOLDER) {
+    if (items[current_item_index].content_type == ARC || strlen(current_archive) > 0) {
+        return;
+    } else if (items[current_item_index].content_type == FOLDER) {
         play_sound(SND_ERROR);
         toast_message(lang.MUXPLORE.ERROR.NO_FOLDER, SHORT);
     } else {
@@ -860,6 +867,11 @@ static void handle_start(void) {
 
 static void handle_select(void) {
     if (msgbox_active || !ui_count || hold_call) return;
+
+    //Setting options not supported for archives and items in archives.
+    if (items[current_item_index].content_type == ARC || strlen(current_archive) > 0) {
+        return;
+    }
 
     play_sound(SND_CONFIRM);
 
@@ -952,12 +964,23 @@ static void init_elements(void) {
 }
 
 static void refresh_nav_items() {
-    if (items[current_item_index].content_type == FOLDER || items[current_item_index].content_type == ARC) {
+    if (items[current_item_index].content_type == FOLDER ||
+        items[current_item_index].content_type == ARC ||
+        strlen(current_archive) > 0
+    ) {
         lv_obj_add_flag(ui_lblNavYGlyph, MU_OBJ_FLAG_HIDE_FLOAT);
         lv_obj_add_flag(ui_lblNavY, MU_OBJ_FLAG_HIDE_FLOAT);
     } else {
         lv_obj_clear_flag(ui_lblNavYGlyph, MU_OBJ_FLAG_HIDE_FLOAT);
         lv_obj_clear_flag(ui_lblNavY, MU_OBJ_FLAG_HIDE_FLOAT);
+    }
+
+    if (strlen(current_archive) > 0) {
+        lv_obj_add_flag(ui_lblNavXGlyph, MU_OBJ_FLAG_HIDE_FLOAT);
+        lv_obj_add_flag(ui_lblNavX, MU_OBJ_FLAG_HIDE_FLOAT);
+    } else {
+        lv_obj_clear_flag(ui_lblNavXGlyph, MU_OBJ_FLAG_HIDE_FLOAT);
+        lv_obj_clear_flag(ui_lblNavX, MU_OBJ_FLAG_HIDE_FLOAT);
     }
 }
 
