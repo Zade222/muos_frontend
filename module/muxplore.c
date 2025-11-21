@@ -926,7 +926,7 @@ static void init_elements(void) {
 }
 
 static void refresh_nav_items() {
-    if (items[current_item_index].content_type == FOLDER) {
+    if (items[current_item_index].content_type == FOLDER || items[current_item_index].content_type == ARC) {
         lv_obj_add_flag(ui_lblNavYGlyph, MU_OBJ_FLAG_HIDE_FLOAT);
         lv_obj_add_flag(ui_lblNavY, MU_OBJ_FLAG_HIDE_FLOAT);
     } else {
