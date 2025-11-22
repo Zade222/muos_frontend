@@ -404,12 +404,7 @@ static void save_custom_options(char *next_screen) {
         init_fe_snd(&fe_snd, idx_sound, idx_sound);
     }
 
-    if (is_modified > 0) {
-        refresh_config = 1;
-
-        const char *args[] = {OPT_PATH "script/mux/tweak.sh", NULL};
-        run_exec(args, A_SIZE(args), 0, 1, NULL, NULL);
-    }
+    if (is_modified > 0) run_tweak_script();
 
     if (file_exist(MUOS_PIK_LOAD)) remove(MUOS_PIK_LOAD);
 }
